@@ -13,25 +13,27 @@ import './index.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HashRouter>
-      <Auth0Provider
-        domain="dev-3gneykmd0foohzrw.us.auth0.com"
-        clientId="u4A9bTGpGhGNhmWMFgtutwiPyKovMjwS"
+      {/* <Auth0Provider
+        domain={import.meta.env.VITE_AUTH0_DOMAIN}
+        clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
         authorizationParams={{
           redirect_uri: window.location.origin + '/CodingCoach/'
         }}
-      >
-        <Routes>
-          <Route path="/" element={
-            <ProtectedRoute>
-              <App />
-            </ProtectedRoute>} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/import" element={
-            <ProtectedRoute>
-              <ChooseRepo />
-            </ProtectedRoute>} />
-        </Routes>
-      </Auth0Provider>
+      > */}
+      <Routes>
+        <Route path="/" element={
+          // <ProtectedRoute>
+          <App />
+          /* </ProtectedRoute> */
+        } />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/import" element={
+          // <ProtectedRoute>
+          <ChooseRepo />
+          /* </ProtectedRoute> */
+        } />
+      </Routes>
+      {/* </Auth0Provider> */}
     </HashRouter>
-  </StrictMode>,
+  </StrictMode >,
 )
