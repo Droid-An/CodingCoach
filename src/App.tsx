@@ -1,6 +1,6 @@
 import './App.css'
 import { useState, useRef, useCallback } from 'react';
-import { getCodeFeedback } from './networks/gpt';
+import { getCodeFeedback, findSimilarPoints, mergeFeedbackPointsByTitle } from './networks/gpt';
 import FeedbackPoint from './FeedbackPoint';
 import { FeedbackPointModel } from './models/FeedbackModel';
 import CodeEditor from '@uiw/react-textarea-code-editor';
@@ -37,32 +37,38 @@ const App = () => {
 
       const feedbackPromises = FEEDBACK_TYPES.map(type => getCodeFeedback(code, type));
 
-      Promise.allSettled(feedbackPromises).then(results => {
-        const combinedPoints: FeedbackPointModel[] = [];
-        let detectedLanguage: string | undefined;
+      const results = await Promise.allSettled(feedbackPromises);
 
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled") {
-            const feedback = result.value;
-            if (!detectedLanguage) {
-              detectedLanguage = feedback.language;
-            }
-            combinedPoints.push(...feedback.feedbackPoints);
-          } else {
-            console.error(`Error fetching ${FEEDBACK_TYPES[index]} feedback:`, result.reason);
+      const combinedPoints: FeedbackPointModel[] = [];
+      let detectedLanguage: string | undefined;
+
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          const feedback = result.value;
+          if (!detectedLanguage) {
+            detectedLanguage = feedback.language;
           }
-        });
-
-        if (detectedLanguage) {
-          setLanguage(detectedLanguage);
+          combinedPoints.push(...feedback.feedbackPoints);
+        } else {
+          console.error(`Error fetching ${FEEDBACK_TYPES[index]} feedback:`, result.reason);
         }
-
-        combinedPoints.sort((a, b) => b.severity - a.severity);
-        setFeedbackList(combinedPoints);
-        setIsLoading(false);
       });
+
+      if (detectedLanguage) {
+        setLanguage(detectedLanguage);
+      }
+
+      combinedPoints.sort((a, b) => b.severity - a.severity);
+
+      const similarPoints = await findSimilarPoints(combinedPoints);
+      const mergedFeedback = await mergeFeedbackPointsByTitle(combinedPoints, similarPoints.merge_groups)
+      setFeedbackList(mergedFeedback);
+
+
     } catch (error) {
       console.error('Error fetching feedback:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, [code]);
 

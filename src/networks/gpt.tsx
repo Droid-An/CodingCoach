@@ -13,13 +13,12 @@ interface ChatMessage {
 }
 
 const getBaseCoach = (area: string): string => (
-    `You are a coding coach who is trained to give feedback only on "${area}". Your task is to provide constructive feedback on the code provided by the user. You will be given code in the first message. You should reply with a JSON object containing feedback on the code only on the area that you have been assigned to below.
+    `You are a coding coach who is trained to give feedback only on "${area}". Your task is to provide constructive feedback on the code provided by the user. You will be given the initial and edited code in the first message. You should reply with a JSON object containing feedback on the edited code only on the area that you have been assigned to below.
 
     You should never, under any circumstances, give the feedback that there should be more code comments or better function documentation. Aim for better, more useful feedback.
     
     All feedback should be in markdown format. All titles used should use H3 as the largest heading.
-    
-    Always give at least four feedback points.`
+    `
 )
 
 const getAdvancedTechniquesCoach = (): ChatMessage => ({
@@ -60,13 +59,37 @@ const getPerformanceCoach = (): ChatMessage => ({
 
 const getConversationalCoach = (): ChatMessage => ({
     role: 'system',
-    content: `You are a coding coach. Your task is to provide constructive feedback on the code provided by the user. 
+    content: `You are a coding coach. Your task is to provide constructive feedback on the edited code provided by the user. 
     
     You will know the codebase, the previous feedback given and then you will be answering questions and queries the trainees has about the feedback.
     
     Keep responses fairly short and conversational.`
 });
 
+const groupCommentsPrompt = (): ChatMessage => ({
+    role: "system",
+    content: `
+You are a similarity classifier for code review feedback.
+
+You are given a list of feedback points.
+Your task is ONLY to identify which feedback points describe the SAME underlying issue
+and therefore could be merged.
+
+Rules:
+1. Do NOT rewrite, summarize, or remove any feedback.
+2. Do NOT create new feedback.
+3. Only decide grouping.
+4. Two feedback points can be grouped ONLY IF:
+   - They refer to the exact same line_numbers
+   - They describe the same root problem, not just related concepts
+5. If nothing should be grouped, return an empty list.
+
+Each merge group is an array of feedback point titles that could be merged.
+Only include groups with 2 or more titles.
+
+This is a classification task, not an editing task.
+`
+})
 
 const getSchema = () => (
     {
@@ -90,7 +113,7 @@ const getSchema = () => (
                             },
                             "summary": {
                                 "type": "string",
-                                "description": "A very short summary of the problem, expained in the context of a beginner coder, without using any of the words in the title."
+                                "description": "A very short summary of the problem, explained in the context of a beginner coder, without using any of the words in the title."
                             },
                             "description": {
                                 "type": "string",
@@ -139,6 +162,28 @@ const getSchema = () => (
     }
 );
 
+const mergeSchema = () => (
+    {
+        "name": "merge_decisions",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "merge_groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 2
+                    }
+                }
+            },
+            "required": ["merge_groups"],
+            "additionalProperties": false
+        },
+        "strict": true
+
+    }
+)
 const addLineNumbers = (code: string): string => {
     const lines = code.split('\n');
     return lines.map((line, index) => `${index + 1}: ${line}`).join('\n');
@@ -202,6 +247,99 @@ export const getCodeFeedback = async (code: string, feedbackType: string): Promi
         throw error;
     }
 };
+
+export const findSimilarPoints = async (prevFeedbackPoints: FeedbackPointModel[]) => {
+
+    const convertFeedbackPointToString = (feedback_point: FeedbackPointModel): string => {
+        const stringOutput: string[] = []
+        for (const [key, value] of Object.entries(feedback_point)) {
+            stringOutput.push(`${key}:${value}`)
+        }
+        return stringOutput.join("\n")
+    };
+    const stringFeedback = prevFeedbackPoints
+        .map(convertFeedbackPointToString)
+        .join('\n\n');
+
+    const messages: ChatMessage[] = [
+        {
+            role: 'user',
+            content: stringFeedback,
+        },
+    ]
+    messages.unshift(groupCommentsPrompt());
+
+    try {
+        const response = await axios.post(
+            API_URL,
+            {
+                model: MODEL_GPT_4O,
+                messages: messages,
+                response_format: {
+                    type: "json_schema",
+                    json_schema: mergeSchema(),
+                }
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+                },
+            }
+        );
+        const feedbackData = JSON.parse(response.data.choices[0].message.content);
+        return feedbackData
+    } catch (error) {
+        console.error('Error starting conversation:', error);
+        throw error;
+    }
+}
+
+
+export const mergeFeedbackPointsByTitle = async (
+    points: FeedbackPointModel[],
+    mergeGroups: string[][]
+) => {
+
+    // map: title → FeedbackPointModel
+    const pointMap = new Map(
+        points.map(p => [p.title, p])
+    );
+
+    // set of titles that were merged
+    const mergedTitles = new Set<string>();
+
+    const result: FeedbackPointModel[] = [];
+
+    for (const group of mergeGroups) {
+        //create an array of points that must be grouped
+        const groupPoints: FeedbackPointModel[] = [];
+
+        for (const title of group) {
+            const point = pointMap.get(title);
+            if (!point) {
+                throw new Error(`Missing feedback for title: ${title}`);
+            }
+            groupPoints.push(point);
+        }
+
+        group.forEach(title => mergedTitles.add(title));
+
+        const mostSeverePoint = groupPoints.reduce((max, current) =>
+            current.severity > max.severity ? current : max
+        );
+        result.push(mostSeverePoint)
+    }
+
+    // Add points that weren't merged
+    for (const p of points) {
+        if (!mergedTitles.has(p.title)) {
+            result.push(p);
+        }
+    }
+    return result;
+}
+
 
 export const continueConversation = async (initialCode: string | undefined, feedbackPoint: string, previousMessages: string[], newMessage: string): Promise<string> => {
     const messages: ChatMessage[] = [
