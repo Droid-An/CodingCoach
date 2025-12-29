@@ -16,11 +16,11 @@ function NavBar() {
                                     Home
                                 </NavLink>
                             </li>
-                            <li className="nav-item">
+                            {/* <li className="nav-item">
                                 <NavLink className="nav-link" to="/import" end>
                                     Import from Github
                                 </NavLink>
-                            </li>
+                            </li> */}
                         </ul>
                     </nav>
                 </div>
