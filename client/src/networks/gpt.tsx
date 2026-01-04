@@ -3,6 +3,7 @@ import { FeedbackModel, FeedbackPointModel } from '../models/FeedbackModel';
 
 const API_URL = 'https://api.openai.com/v1/chat/completions';
 
+
 const MODEL_GPT_4O = 'gpt-4o';
 // const MODEL_GPT_4O_MINI = 'gpt-4o-mini';
 // const MODEL_GPT_35_TURBO = 'gpt-3.5-turbo';
@@ -208,24 +209,31 @@ export const getCodeFeedback = async (code: string, feedbackType: string): Promi
     }
 
     try {
-        const response = await axios.post(
-            API_URL,
-            {
-                model: MODEL_GPT_4O,
-                messages: messages,
-                response_format: {
-                    type: "json_schema",
-                    json_schema: getSchema(),
-                }
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-                },
+        // const response = await axios.post(
+        //     API_URL,
+        // {
+        //     model: MODEL_GPT_4O,
+        //     messages: messages,
+        //     response_format: {
+        //         type: "json_schema",
+        //         json_schema: getSchema(),
+        //     }
+        //     },
+        //     {
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //             'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+        //         },
+        //     }
+        // );
+        const response = await axios.post('/api/chat', {
+            model: MODEL_GPT_4O,
+            messages: messages,
+            response_format: {
+                type: "json_schema",
+                json_schema: getSchema(),
             }
-        );
-
+        });
         const feedbackData = JSON.parse(response.data.choices[0].message.content);
         const feedbackPoints = feedbackData.feedback_points.map((point: any) => new FeedbackPointModel(
             point.title,
@@ -270,23 +278,31 @@ export const findSimilarPoints = async (prevFeedbackPoints: FeedbackPointModel[]
     messages.unshift(groupCommentsPrompt());
 
     try {
-        const response = await axios.post(
-            API_URL,
-            {
-                model: MODEL_GPT_4O,
-                messages: messages,
-                response_format: {
-                    type: "json_schema",
-                    json_schema: mergeSchema(),
-                }
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-                },
+        // const response = await axios.post(
+        //     API_URL,
+        //     {
+        // model: MODEL_GPT_4O,
+        // messages: messages,
+        // response_format: {
+        //     type: "json_schema",
+        //     json_schema: mergeSchema(),
+        //         }
+        //     },
+        //     {
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //             'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+        //         },
+        //     }
+        // );
+        const response = await axios.post("/api/chat", {
+            model: MODEL_GPT_4O,
+            messages: messages,
+            response_format: {
+                type: "json_schema",
+                json_schema: mergeSchema(),
             }
-        );
+        })
         const feedbackData = JSON.parse(response.data.choices[0].message.content);
         return feedbackData
     } catch (error) {
@@ -362,19 +378,23 @@ export const continueConversation = async (initialCode: string | undefined, feed
     ];
 
     try {
-        const response = await axios.post(
-            API_URL,
-            {
-                model: MODEL_GPT_4O,
-                messages: [getConversationalCoach(), ...messages],
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
-                },
-            }
-        );
+        // const response = await axios.post(
+        //     API_URL,
+        //     {
+        //         model: MODEL_GPT_4O,
+        //         messages: [getConversationalCoach(), ...messages],
+        //     },
+        //     {
+        //         headers: {
+        //             'Content-Type': 'application/json',
+        //             'Authorization': `Bearer ${import.meta.env.VITE_API_KEY}`,
+        //         },
+        //     }
+        // );
+        const response = await axios.post('/api/chat', {
+            model: MODEL_GPT_4O,
+            messages: [getConversationalCoach(), ...messages]
+        })
 
         return response.data.choices[0].message.content
     } catch (error) {

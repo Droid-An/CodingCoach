@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import App from './App.tsx'
 import './scss/styles.scss'
-import LoginPage from './LoginPage';
-import { ProtectedRoute } from './routes/ProtectedRoute';
+import LoginPage from './LoginPage.tsx';
+import { ProtectedRoute } from './routes/ProtectedRoute.tsx';
 import { Auth0Provider } from '@auth0/auth0-react';
 import ChooseRepo from './ChooseRepoPage.tsx';
 import './index.css'
