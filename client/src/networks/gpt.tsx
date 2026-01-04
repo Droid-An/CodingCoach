@@ -1,7 +1,12 @@
 import axios from 'axios';
 import { FeedbackModel, FeedbackPointModel } from '../models/FeedbackModel';
 
-const API_URL = 'https://api.openai.com/v1/chat/completions';
+const API_BASE = import.meta.env.DEV
+    ? "" // uses Vite proxy in development
+    : import.meta.env.VITE_SERVER_URL; // backend in production
+
+const apiUrl = (endpoint: string) => `${API_BASE}${endpoint}`;
+
 
 
 const MODEL_GPT_4O = 'gpt-4o';
@@ -226,7 +231,7 @@ export const getCodeFeedback = async (code: string, feedbackType: string): Promi
         //         },
         //     }
         // );
-        const response = await axios.post('/api/chat', {
+        const response = await axios.post(apiUrl('/api/chat'), {
             model: MODEL_GPT_4O,
             messages: messages,
             response_format: {
@@ -295,7 +300,7 @@ export const findSimilarPoints = async (prevFeedbackPoints: FeedbackPointModel[]
         //         },
         //     }
         // );
-        const response = await axios.post("/api/chat", {
+        const response = await axios.post(apiUrl('/api/chat'), {
             model: MODEL_GPT_4O,
             messages: messages,
             response_format: {
@@ -391,7 +396,7 @@ export const continueConversation = async (initialCode: string | undefined, feed
         //         },
         //     }
         // );
-        const response = await axios.post('/api/chat', {
+        const response = await axios.post(apiUrl('/api/chat'), {
             model: MODEL_GPT_4O,
             messages: [getConversationalCoach(), ...messages]
         })
